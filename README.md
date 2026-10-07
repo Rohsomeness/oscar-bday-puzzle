@@ -2,7 +2,7 @@
 
 A one-page puzzle for Oscar, built the same way as [veet-bday-puzzle](https://github.com/Rohsomeness/veet-bday-puzzle). Each clue is a photo, a video, or just a question. The answer is stored as a SHA-256 hash, so it is not written in the page.
 
-Three clues are in so far. `GIFT_MESSAGE` is still a stand-in.
+Five clues are in so far. `GIFT_MESSAGE` is still a stand-in.
 
 ## Add a clue
 
