@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Happy 28th 🎉</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A birthday puzzle for Oscar." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎂</text></svg>" />
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 24px 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.08);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 24px;
+      width: min(420px, 100%);
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      animation: cardFade 0.35s ease;
+      transition: opacity 0.25s ease;
+    }
+
+    h1 {
+      margin: 0;
+      font-weight: 600;
+      font-size: 1.45rem;
+      letter-spacing: -0.02em;
+    }
+
+    .media-wrapper {
+      position: relative;
+      overflow: hidden;
+      border-radius: 12px;
+      margin: 16px 0;
+      background: black;
+    }
+
+    .media-wrapper img,
+    .media-wrapper video {
+      width: 100%;
+      max-height: 52vh;
+      object-fit: contain;
+      display: block;
+      background: black;
+      animation: mediaEnter 0.5s ease;
+    }
+
+    .question {
+      font-size: 16px;
+      line-height: 1.45;
+      margin: 0 0 12px;
+    }
+
+    form { margin: 0; }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    input::placeholder { color: #8a8a8a; }
+
+    input:focus { outline: 2px solid #00c6ff; }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      background: #00c6ff;
+      color: black;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+
+    button:hover { background: #00aee6; }
+
+    .progress {
+      margin: 12px 0 0;
+      font-size: 14px;
+      opacity: 0.8;
+    }
+
+    .error {
+      color: #ff6b6b;
+      font-size: 14px;
+      margin-top: 6px;
+      min-height: 1.2em;
+    }
+
+    .reveal { animation: revealGift 1s ease forwards; }
+
+    .code {
+      font-size: 22px;
+      letter-spacing: 0.02em;
+      line-height: 1.4;
+      margin-top: 12px;
+      overflow-wrap: anywhere;
+      animation: glow 1.5s infinite alternate;
+    }
+
+    @keyframes cardFade {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes mediaEnter {
+      from { opacity: 0; transform: scale(1.03) translateY(6px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    @keyframes revealGift {
+      0% { opacity: 0; transform: scale(0.96); }
+      60% { opacity: 1; transform: scale(1.02); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes glow {
+      from { text-shadow: 0 0 5px #00c6ff; }
+      to { text-shadow: 0 0 15px #00c6ff; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .card,
+      .media-wrapper img,
+      .media-wrapper video,
+      .reveal,
+      .code {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="card" id="app"></div>
+
+<script>
+/* Add each clue here. Hash the answer with:
+   python3 scripts/hash_answer.py "the answer"
+   The page trims and lowercases before hashing. */
+const puzzles = [
+  // {
+  //   type: "image",
+  //   src: "images/1.jpg",
+  //   question: "What year was this taken?",
+  //   answerHash: "",
+  // },
+];
+
+// Shown after the last correct answer. Swap this for the real gift.
+const GIFT_MESSAGE = "Happy 28th, Oscar.";
+
+const STORAGE_KEY = "oscar-bday-puzzle";
+
+let current = 0;
+let locked = false;
+const app = document.getElementById("app");
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+async function hash(text) {
+  const msg = new TextEncoder().encode(text.toLowerCase());
+  const buffer = await crypto.subtle.digest("SHA-256", msg);
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function hashesFor(puzzle) {
+  const hashes = [];
+  if (puzzle.answerHash) hashes.push(puzzle.answerHash);
+  if (Array.isArray(puzzle.answerHashes)) hashes.push(...puzzle.answerHashes);
+  return hashes.map((h) => String(h).toLowerCase());
+}
+
+function loadProgress() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (!saved || saved.count !== puzzles.length) return 0;
+    const index = Number(saved.index);
+    if (!Number.isInteger(index) || index < 0) return 0;
+    return Math.min(index, puzzles.length);
+  } catch {
+    return 0;
+  }
+}
+
+function saveProgress(index) {
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ index, count: puzzles.length })
+  );
+}
+
+function mediaHtml(puzzle) {
+  if (!puzzle.src) return "";
+  const src = escapeHtml(puzzle.src);
+  const tag = puzzle.type === "video"
+    ? `<video src="${src}" controls playsinline></video>`
+    : `<img src="${src}" alt="" />`;
+  return `<div class="media-wrapper">${tag}</div>`;
+}
+
+function renderWaiting() {
+  app.innerHTML = `
+    <h1>Happy 28th, Oscar 🎂</h1>
+    <p class="question">The questions aren't up yet.</p>
+    <p class="progress">They'll land here one at a time.</p>
+  `;
+}
+
+function renderPuzzle() {
+  const puzzle = puzzles[current];
+  app.innerHTML = `
+    <h1>Happy 28th, Oscar 🎂</h1>
+    ${mediaHtml(puzzle)}
+    <p class="question">${escapeHtml(puzzle.question)}</p>
+    <form id="answer-form">
+      <input id="answer" placeholder="Your answer..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+      <button type="submit">Submit</button>
+    </form>
+    <div class="error" id="error"></div>
+    <div class="progress">Question ${current + 1} / ${puzzles.length}</div>
+  `;
+
+  document.getElementById("answer-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitAnswer();
+  });
+  document.getElementById("answer").focus();
+}
+
+async function submitAnswer() {
+  if (locked) return;
+
+  const input = document.getElementById("answer");
+  const value = input.value.trim();
+  const error = document.getElementById("error");
+
+  if (!value) {
+    error.textContent = "Type an answer first.";
+    input.focus();
+    return;
+  }
+
+  if (!crypto.subtle) {
+    error.textContent = "Open this over the live site or http://localhost. A file:// link can't check answers.";
+    return;
+  }
+
+  const inputHash = await hash(value);
+  if (!hashesFor(puzzles[current]).includes(inputHash)) {
+    error.textContent = "Not quite — try again.";
+    input.focus();
+    input.select();
+    return;
+  }
+
+  locked = true;
+  const video = document.querySelector("video");
+  if (video) video.pause();
+
+  current += 1;
+  saveProgress(current);
+  app.style.opacity = "0";
+
+  window.setTimeout(() => {
+    locked = false;
+    app.style.opacity = "1";
+    if (current >= puzzles.length) revealGift();
+    else renderPuzzle();
+  }, 250);
+}
+
+function revealGift() {
+  app.innerHTML = `
+    <div class="reveal">
+      <h1>You did it 🎉</h1>
+      <p class="question">Your gift 🎁</p>
+      <div class="code">${escapeHtml(GIFT_MESSAGE)}</div>
+    </div>
+  `;
+}
+
+function start() {
+  if (puzzles.length === 0) {
+    renderWaiting();
+    return;
+  }
+  current = loadProgress();
+  if (current >= puzzles.length) revealGift();
+  else renderPuzzle();
+}
+
+start();
+</script>
+</body>
+</html>
